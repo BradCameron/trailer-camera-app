@@ -1,0 +1,5 @@
+{
+  "name": "Trailer Backup Camera",
+  "description": "A web application to display a live video feed from an ESP32-CAM and show distance information from an ESP32 with an ultrasonic sensor, designed to assist with backing up a trailer.",
+  "requestFramePermissions": []
+}
