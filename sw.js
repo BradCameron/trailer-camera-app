@@ -7,6 +7,7 @@ const URLS_TO_CACHE = [
   '/constants.ts',
   '/components/MainDisplay.tsx',
   '/components/SettingsScreen.tsx',
+  '/components/VoiceAssistant.tsx',
   '/hooks/useAudioBeeper.ts',
   '/hooks/useBackupSensor.ts',
   '/hooks/useScreenControls.ts',

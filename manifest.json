@@ -1,6 +1,7 @@
 {
   "short_name": "Trailer Cam",
-  "name": "Trailer Backup Camera System",
+  "name": "Trailer Backup System",
+  "description": "A trailer backup camera and sensor system with distance alerts.",
   "icons": [
     {
       "src": "/assets/icon.svg",

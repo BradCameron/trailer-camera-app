@@ -3,7 +3,6 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://BradCameron.github.io/trailer-camera-app",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface SettingsScreenProps {
   onSave: (sensorIp: string, cameraIp: string, isSimulation: boolean) => void;
@@ -7,15 +7,52 @@ interface SettingsScreenProps {
   initialIsSimulation?: boolean;
 }
 
+// For PWA "Add to Home Screen" functionality
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: Array<string>;
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed',
+    platform: string,
+  }>;
+  prompt(): Promise<void>;
+}
+
 const SettingsScreen: React.FC<SettingsScreenProps> = ({ 
     onSave,
-    initialSensorIp = '192.168.5.40',
-    initialCameraIp = '192.168.5.41',
+    initialSensorIp = '192.168.1.40',
+    initialCameraIp = '192.168.1.41',
     initialIsSimulation = false,
 }) => {
   const [sensorIp, setSensorIp] = useState<string>(initialSensorIp);
   const [cameraIp, setCameraIp] = useState<string>(initialCameraIp);
   const [isSimulation, setIsSimulation] = useState<boolean>(initialIsSimulation);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+        e.preventDefault();
+        setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+    setInstallPrompt(null);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,8 +131,19 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
             </label>
           </div>
 
-
-          <div>
+          <div className="space-y-4">
+            {installPrompt && (
+               <button
+                  type="button"
+                  onClick={handleInstallClick}
+                  className="group relative w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  Install App
+                </button>
+            )}
             <button
               type="submit"
               className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500"

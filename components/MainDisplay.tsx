@@ -1,166 +1,9 @@
-import React, { useState, useMemo, useCallback, useEffect, FormEvent, useRef } from 'react';
-import { GoogleGenAI, Chat } from '@google/genai';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useBackupSensor } from '../hooks/useBackupSensor';
 import { useAudioBeeper } from '../hooks/useAudioBeeper';
 import { useScreenControls } from '../hooks/useScreenControls';
 import { GUIDELINE_DISTANCES, GUIDELINE_COLORS, MAX_SENSOR_DISTANCE_IN } from '../constants';
-
-// --- Start of AI Chat Panel Component ---
-
-interface Message {
-  role: 'user' | 'model';
-  text: string;
-}
-
-interface ChatPanelProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-const API_KEY = process.env.API_KEY;
-
-// SVG Icons for Chat
-const CloseIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-);
-
-const SendIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-    </svg>
-);
-
-const ChatPanel: React.FC<ChatPanelProps> = ({ isOpen, onClose }) => {
-    const [input, setInput] = useState('');
-    const [history, setHistory] = useState<Message[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    
-    const chatRef = useRef<Chat | null>(null);
-    const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        const initialMessage: Message = { 
-            role: 'model', 
-            text: "Hello! I'm Co-Pilot. Ask me anything about trailer safety or maneuvering. How can I help?"
-        };
-        const storedHistory = localStorage.getItem('chatHistory');
-        if (storedHistory) {
-            setHistory(JSON.parse(storedHistory));
-        } else {
-            setHistory([initialMessage]);
-        }
-
-        if (!API_KEY) {
-            setError("AI assistant is not configured.");
-            console.warn("API_KEY environment variable not set. Chat feature disabled.");
-            return;
-        }
-        try {
-            const ai = new GoogleGenAI({ apiKey: API_KEY });
-            const chat = ai.chats.create({
-                model: 'gemini-2.5-flash',
-                config: {
-                    systemInstruction: "You are a helpful assistant for drivers backing up trailers. Your name is 'Co-Pilot'. Provide clear, concise, and safe advice. You can answer questions about trailer safety, maneuvering techniques, and general driving tips. Keep your answers brief and to the point.",
-                },
-            });
-            chatRef.current = chat;
-        } catch (e: any) {
-            console.error("Failed to initialize Gemini:", e);
-            setError("Failed to initialize AI assistant.");
-        }
-    }, []);
-
-    useEffect(() => {
-        if (history.length > 0) {
-            localStorage.setItem('chatHistory', JSON.stringify(history));
-        }
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [history]);
-
-    const handleSendMessage = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!input.trim() || isLoading || !chatRef.current) return;
-
-        const userMessage: Message = { role: 'user', text: input };
-        setHistory(prev => [...prev, userMessage]);
-        setInput('');
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            const response = await chatRef.current.sendMessage({ message: userMessage.text });
-            const modelMessage: Message = { role: 'model', text: response.text };
-            setHistory(prev => [...prev, modelMessage]);
-        } catch (e: any) {
-            console.error("Gemini API error:", e);
-            const friendlyError = "Sorry, I couldn't get a response. Please check your connection and try again.";
-            setError(friendlyError);
-            setHistory(prev => [...prev, {role: 'model', text: friendlyError}]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    return (
-        <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-gray-800/80 backdrop-blur-md shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-            <div className="flex flex-col h-full">
-                <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
-                    <h2 className="text-xl font-bold text-white">Co-Pilot Assistant</h2>
-                    <button onClick={onClose} className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white transition-colors" aria-label="Close chat">
-                        <CloseIcon className="w-6 h-6" />
-                    </button>
-                </header>
-
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {history.map((msg, index) => (
-                        <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            {msg.role === 'model' && <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">CP</div>}
-                            <div className={`max-w-xs md:max-w-sm px-4 py-2 rounded-2xl ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-200 rounded-bl-none'}`}>
-                                <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</p>
-                            </div>
-                        </div>
-                    ))}
-                    {isLoading && (
-                        <div className="flex items-end gap-2 justify-start">
-                             <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">CP</div>
-                             <div className="px-4 py-2 rounded-2xl bg-gray-700 rounded-bl-none">
-                                <div className="flex items-center space-x-1 h-5">
-                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse [animation-delay:-0.3s]"></div>
-                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse [animation-delay:-0.15s]"></div>
-                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                                </div>
-                             </div>
-                        </div>
-                    )}
-                     <div ref={messagesEndRef} />
-                </div>
-                
-                {error && !isLoading && <div className="p-4 text-center text-red-400 text-sm flex-shrink-0">{error}</div>}
-
-                <footer className="p-4 border-t border-gray-700 flex-shrink-0">
-                    <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder={error ? "AI unavailable" : "Ask for trailer advice..."}
-                            className="flex-1 w-full px-4 py-2 bg-gray-900 border border-gray-600 rounded-full text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                            disabled={isLoading || error !== null}
-                        />
-                        <button type="submit" className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-blue-600 rounded-full text-white hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors" disabled={!input.trim() || isLoading || error !== null}>
-                            <SendIcon className="w-5 h-5" />
-                        </button>
-                    </form>
-                </footer>
-            </div>
-        </div>
-    );
-};
-
-// --- End of AI Chat Panel Component ---
+import VoiceAssistant from './VoiceAssistant';
 
 
 interface MainDisplayProps {
@@ -180,7 +23,7 @@ const SettingsIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
 );
 const SpeakerWaveIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}> <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /> </svg> );
 const SpeakerXMarkIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}> <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75 19.5 12m0 0 2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6 4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75Z" /> </svg> );
-const ChatIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}> <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.76 9.76 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.455.09-.934.09-1.425v-2.134c0-2.639 3.03-4.75 6.75-4.75 3.72 0 6.75 2.111 6.75 4.75z" /> </svg> );
+const MicrophoneIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}> <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 016 0v8.25a3 3 0 01-3 3z" /> </svg> );
 const ExpandIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}> <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m-4.5 11.25l-4.5 4.5m0 0v-4.5m4.5 4.5h-4.5M15 15l4.5 4.5m0-4.5v4.5m0-4.5h-4.5" /> </svg> );
 const CompressIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}> <path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5M15 15l5.25 5.25" /> </svg> );
 const WakeLockIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => ( <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}> <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0z" /> </svg> );
@@ -190,7 +33,7 @@ const MirrorHorizontalIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) =>
 const MainDisplay: React.FC<MainDisplayProps> = ({ sensorIp, cameraIp, onShowSettings, isSimulationMode }) => {
   const [isStarted, setIsStarted] = useState(false);
   const [isMuted, setIsMuted] = useState<boolean>(() => localStorage.getItem('isMuted') === 'true');
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false);
   
   const { distance, connectionStatus } = useBackupSensor(
     isStarted ? (isSimulationMode ? 'simulation' : sensorIp) : null,
@@ -211,6 +54,12 @@ const MainDisplay: React.FC<MainDisplayProps> = ({ sensorIp, cameraIp, onShowSet
     lockOrientation, 
     unlockOrientation 
   } = useScreenControls();
+
+  const camLoadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleToggleMute = useCallback(() => setIsMuted(m => !m), []);
+  const handleToggleMirror = useCallback(() => setIsMirrored(m => !m), []);
+  const handleToggleFlip = useCallback(() => setIsFlipped(f => !f), []);
 
   useEffect(() => {
     localStorage.setItem('isMuted', String(isMuted));
@@ -260,17 +109,47 @@ const MainDisplay: React.FC<MainDisplayProps> = ({ sensorIp, cameraIp, onShowSet
     Object.entries(GUIDELINE_DISTANCES).sort(([, distA], [, distB]) => distA - distB), 
   []);
 
+  const clearCamLoadTimeout = useCallback(() => {
+    if (camLoadTimeoutRef.current) {
+        clearTimeout(camLoadTimeoutRef.current);
+        camLoadTimeoutRef.current = null;
+    }
+  }, []);
+
   const handleCamError = useCallback(() => {
       if (!isSimulationMode) {
+        clearCamLoadTimeout();
         setCamError(true);
       }
-  }, [isSimulationMode]);
+  }, [isSimulationMode, clearCamLoadTimeout]);
+
+  const handleCamLoadSuccess = useCallback(() => {
+    clearCamLoadTimeout();
+    setCamError(false);
+  }, [clearCamLoadTimeout]);
+
+  useEffect(() => {
+    if (isStarted && videoUrl && !isSimulationMode) {
+        clearCamLoadTimeout();
+        camLoadTimeoutRef.current = setTimeout(() => {
+            const img = document.getElementById('camera-stream') as HTMLImageElement;
+            if (img && img.naturalWidth === 0) {
+                console.error("Camera stream timed out.");
+                setCamError(true);
+            }
+        }, 5000); // 5 second timeout
+    }
+    return () => {
+        clearCamLoadTimeout();
+    };
+  }, [isStarted, videoUrl, isSimulationMode, setCamError, clearCamLoadTimeout]);
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-black">
       <img
         id="camera-stream"
         src={videoUrl}
+        onLoad={handleCamLoadSuccess}
         onError={handleCamError}
         className={`absolute top-0 left-0 w-full h-full object-cover transition-transform duration-200 ease-in-out ${isStarted ? 'opacity-100' : 'opacity-0'}`}
         style={{ transform: `${isMirrored ? 'scaleX(-1)' : ''} ${isFlipped ? 'scaleY(-1)' : ''}` }}
@@ -324,14 +203,24 @@ const MainDisplay: React.FC<MainDisplayProps> = ({ sensorIp, cameraIp, onShowSet
         <div className="flex items-center gap-2 sm:gap-3 p-2 bg-black/50 backdrop-blur-md rounded-full pointer-events-auto">
             <button onClick={toggleFullscreen} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-gray-600/80 hover:bg-gray-500/80 rounded-full transition-colors" aria-label={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}> {isFullscreen ? <CompressIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> : <ExpandIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />} </button>
             <button onClick={onShowSettings} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-gray-600/80 hover:bg-gray-500/80 rounded-full transition-colors" aria-label="Settings"> <SettingsIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> </button>
-            <button onClick={() => setIsChatOpen(true)} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-purple-600/80 hover:bg-purple-500/80 rounded-full transition-colors" aria-label="Co-Pilot Assistant"> <ChatIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> </button>
-            <button onClick={() => setIsMuted(m => !m)} className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full transition-colors ${isMuted ? 'bg-gray-600/80 hover:bg-gray-500/80' : 'bg-green-600/80 hover:bg-green-500/80'}`} aria-label={isMuted ? "Unmute" : "Mute"}> {isMuted ? <SpeakerXMarkIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> : <SpeakerWaveIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />} </button>
-            <button onClick={() => setIsFlipped(f => !f)} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-blue-600/80 hover:bg-blue-500/80 rounded-full transition-colors" aria-label="Flip Vertically"> <FlipVerticalIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> </button>
-            <button onClick={() => setIsMirrored(m => !m)} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-blue-600/80 hover:bg-blue-500/80 rounded-full transition-colors" aria-label="Mirror Horizontally"> <MirrorHorizontalIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> </button>
+            <button onClick={() => setIsVoiceAssistantOpen(true)} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-purple-600/80 hover:bg-purple-500/80 rounded-full transition-colors" aria-label="Co-Pilot Assistant"> <MicrophoneIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> </button>
+            <button onClick={handleToggleMute} className={`w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full transition-colors ${isMuted ? 'bg-gray-600/80 hover:bg-gray-500/80' : 'bg-green-600/80 hover:bg-green-500/80'}`} aria-label={isMuted ? "Unmute" : "Mute"}> {isMuted ? <SpeakerXMarkIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> : <SpeakerWaveIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />} </button>
+            <button onClick={handleToggleFlip} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-blue-600/80 hover:bg-blue-500/80 rounded-full transition-colors" aria-label="Flip Vertically"> <FlipVerticalIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> </button>
+            <button onClick={handleToggleMirror} className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center bg-blue-600/80 hover:bg-blue-500/80 rounded-full transition-colors" aria-label="Mirror Horizontally"> <MirrorHorizontalIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" /> </button>
         </div>
       </div>
 
-      <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      <VoiceAssistant 
+        isOpen={isVoiceAssistantOpen} 
+        onClose={() => setIsVoiceAssistantOpen(false)} 
+        distance={distance}
+        actions={{
+            toggleMute: handleToggleMute,
+            toggleMirror: handleToggleMirror,
+            toggleFlip: handleToggleFlip,
+            toggleFullscreen: toggleFullscreen,
+        }}
+        />
 
       {!isStarted && (
         <div className="absolute inset-0 bg-black/80 flex flex-col justify-center items-center z-10 backdrop-blur-sm">
@@ -341,10 +230,10 @@ const MainDisplay: React.FC<MainDisplayProps> = ({ sensorIp, cameraIp, onShowSet
         </div>
       )}
       {camError && (
-        <div className="absolute inset-0 bg-red-900/90 flex flex-col justify-center items-center z-20 backdrop-blur-sm">
+        <div className="absolute inset-0 bg-red-900/90 flex flex-col justify-center items-center z-20 backdrop-blur-sm text-center p-4">
           <h2 className="text-3xl font-bold text-white">Camera Error</h2>
-          <p className="text-red-200 mt-2">Could not load video stream.</p>
-          <p className="text-red-300 mt-1">Check camera IP and network connection.</p>
+          <p className="text-red-200 mt-2">Could not load video stream. The connection may have timed out.</p>
+          <p className="text-red-300 mt-1">Please check the camera IP address and your network connection.</p>
            <button onClick={onShowSettings} className="mt-8 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform hover:scale-105"> Go to Settings </button>
         </div>
       )}
