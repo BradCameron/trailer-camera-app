@@ -1,7 +1,0 @@
-{
-  "name": "Trailer Backup System",
-  "description": "A trailer backup camera and sensor system with distance alerts and an AI assistant.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}
