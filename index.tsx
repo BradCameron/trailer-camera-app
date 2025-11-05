@@ -8,6 +8,7 @@ import App from './App';
 // which generates dynamically named output files. This was likely causing
 // a caching issue leading to a blank screen on deployment.
 // A proper PWA plugin should be used to generate the service worker if offline functionality is desired.
+*/
 if ('serviceWorker'in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
@@ -19,7 +20,6 @@ if ('serviceWorker'in navigator) {
       });
   });
 }
-*/
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

@@ -55,40 +55,46 @@ export const useBackupSensor = (ipAddress: string | null, isSimulation: boolean 
         }
 
         setConnectionStatus('Connecting');
-        const socket = new WebSocket(`ws://${ipAddress}:${WEBSOCKET_PORT}/`);
 
-        socket.onopen = () => {
-            console.log('WebSocket connection opened.');
-            setConnectionStatus('Connected');
-            if (reconnectTimeoutRef.current) {
-                clearTimeout(reconnectTimeoutRef.current);
-            }
-        };
+        try {
+            const socket = new WebSocket(`ws://${ipAddress}:${WEBSOCKET_PORT}/`);
 
-        socket.onmessage = (event) => {
-            const newDistance = parseFloat(event.data);
-            if (!isNaN(newDistance)) {
-                setDistance(newDistance > 0 ? newDistance : null);
-            }
-        };
+            socket.onopen = () => {
+                console.log('WebSocket connection opened.');
+                setConnectionStatus('Connected');
+                if (reconnectTimeoutRef.current) {
+                    clearTimeout(reconnectTimeoutRef.current);
+                }
+            };
 
-        socket.onclose = (event) => {
-            console.log('WebSocket connection closed:', event.code, event.reason);
-            setConnectionStatus('Disconnected');
-            setDistance(null);
-            
-            if (event.code !== 1000) {
-                 reconnectTimeoutRef.current = setTimeout(connect, 3000);
-            }
-        };
+            socket.onmessage = (event) => {
+                const newDistance = parseFloat(event.data);
+                if (!isNaN(newDistance)) {
+                    setDistance(newDistance > 0 ? newDistance : null);
+                }
+            };
 
-        socket.onerror = (error) => {
-            console.error('WebSocket Error:', error);
+            socket.onclose = (event) => {
+                console.log('WebSocket connection closed:', event.code, event.reason);
+                setConnectionStatus('Disconnected');
+                setDistance(null);
+                
+                if (event.code !== 1000) {
+                     reconnectTimeoutRef.current = setTimeout(connect, 3000);
+                }
+            };
+
+            socket.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+                setConnectionStatus('Error');
+                socket.close();
+            };
+
+            socketRef.current = socket;
+        } catch (e) {
+            console.error("Failed to create WebSocket:", e);
             setConnectionStatus('Error');
-            socket.close();
-        };
-
-        socketRef.current = socket;
+        }
     }
 
     connect();

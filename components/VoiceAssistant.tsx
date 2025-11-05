@@ -1,13 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-// FIX: The `LiveSession` type is not exported from the main module.
-// We can derive it from the `GoogleGenAI` class instance type.
+// Fix: The 'LiveSession' type is not exported from the '@google/genai' package.
+// It has been removed from the import statement to fix the error.
 import { GoogleGenAI, LiveServerMessage, Modality, Blob, FunctionDeclaration, Type } from '@google/genai';
 import { GUIDELINE_DISTANCES } from '../constants';
 
 // --- Props and Types ---
-// Deriving the LiveSession type from the return type of the connect method.
-type LiveSession = Awaited<ReturnType<InstanceType<typeof GoogleGenAI>['live']['connect']>>;
-
 interface VoiceAssistantProps {
     isOpen: boolean;
     onClose: () => void;
@@ -86,7 +83,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ isOpen, onClose, distan
     const [modelTranscript, setModelTranscript] = useState('');
     const [error, setError] = useState<string | null>(null);
 
-    const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
+    // Fix: The 'LiveSession' type is not exported. Using 'any' for the session promise type.
+    const sessionPromiseRef = useRef<Promise<any> | null>(null);
     const inputAudioContextRef = useRef<AudioContext | null>(null);
     const outputAudioContextRef = useRef<AudioContext | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);

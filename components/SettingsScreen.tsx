@@ -56,8 +56,10 @@ const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSimulation || (sensorIp && cameraIp)) {
-      onSave(sensorIp, cameraIp, isSimulation);
+    const cleanSensorIp = sensorIp.trim();
+    const cleanCameraIp = cameraIp.trim();
+    if (isSimulation || (cleanSensorIp && cleanCameraIp)) {
+      onSave(cleanSensorIp, cleanCameraIp, isSimulation);
     }
   };
 
